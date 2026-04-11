@@ -1,9 +1,42 @@
 <!DOCTYPE html>
 <!--
+Grey-Line tool for understanding grey-line radio propagation opportunities between two locations.
 
+🌍 Features
+- Displays short-path and long-path between two cities
+- Calculates and renders the grey-line (terminator)
+- Supports multiple twilight definitions:
+  - Civil (-6°)
+  - Nautical (-12°)
+  - Astronomical (-18°)
+- Interactive time controls:
+  - Manual stepping (+10 min / -10 min)
+  - Play / Pause animation
+  - Live UTC mode
+- Timeline showing:
+  - Dawn / Sunrise / Sunset / Dusk
+  - Overlap windows between stations
+- “Best Dates” and “Best Window” analysis tools
+---
+
+Notes for future maintenance:
+
+1. The Mercator projection uses a working latitude window chosen to preserve useful country proportions:
+      drawLatMin = -70
+      drawLatMax = 75
+2. Horizontal drag works by applying a longitude offset to the projection, while preserving world wrap.
+3. CALCULATE intentionally preserves the current dragged view.
+4. City labels use white backing rectangles to remain readable over paths and shading.
+5. The current map is intended as a stable baseline before future optional enhancements.
+6. If changing projection geometry in future versions, update all layers together:
+      coastlines, graticule, shading, paths, pins, labels.
+7. If a future edit causes a blank white page, first check for malformed HTML tags near the top
+   (especially <title>, <style>, and <script> blocks).
+
+grey-line release 1.1
+------------------------
 
 -->
-
 
 <html lang="en">
 <head>
@@ -3013,6 +3046,15 @@ const CITIES = {
       "lat": -27.455,
       "lon": 153.0351,
       "population": 1860000,
+      "capital": false
+    },
+    {
+      "name": "Ocean View, Australia",
+      "city": "VK1A",
+      "country": "Australia",
+      "lat": -27.122,
+      "lon": 152.8175,
+      "population": 5000,
       "capital": false
     },
     {
