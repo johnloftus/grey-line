@@ -1532,6 +1532,23 @@ grey-line release 1.2
     gap: 10px;
     flex-wrap: wrap;
   }
+  .wspr-radius-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .wspr-radius-control select {
+    width: auto;
+    min-width: 116px;
+    padding: 8px 30px 8px 10px;
+    font-size: 11px;
+  }
 
 </style>
 </head>
@@ -1570,7 +1587,7 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
 <p>Press <strong>🔍 Scan All Cities</strong> to rank every city in the database by overlap duration against your Station Alpha — useful for finding the best DX targets on a given date.</p>
 <p>You can narrow the search by using the <strong>MIN OVERLAP</strong> lever which sets the minimum duration of overlap. Press the scan button again to close the scan report.</p>
 <p>Press <strong>📅 Best Dates</strong> to see which months of the year offer overlap for the selected city pair — helpful for planning ahead. Press it again to close the report.</p>
-<p>The <strong>WSPR Band Activity</strong> card checks recent WSPR spots for the selected city pair. It uses the selected path endpoints and reports bands with matching activity in the last 30 minutes. WSPR activity is evidence of recent low-power beacon reception near the selected path endpoints, not a guarantee that voice, data, or every station setup will work.</p>
+<p>The <strong>WSPR Band Activity Report</strong> card checks live recent WSPR spots for the selected city pair. It always uses current UTC from wspr.live, independent of the grey-line planning date, and reports bands with matching activity in the last 30 minutes. WSPR activity is evidence of recent low-power beacon reception near the selected path endpoints, not a guarantee that voice, data, or every station setup will work.</p>
 <p>After changing any option that affects the map and timeline bars, remember to press <strong>⚡ CALCULATE</strong>.</p>
 <div class="disclaimer">
   Developed by John Loftus (VK4CT)<br/>
@@ -1781,17 +1798,30 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
 <div class="wspr-card" id="wsprCard">
   <div class="wspr-head">
     <div>
-      <div class="wspr-title">WSPR BAND ACTIVITY — SELECTED PATH</div>
-      <div class="wspr-meta" id="wsprMeta">Select two cities and calculate to check recent WSPR reports.</div>
+      <div class="wspr-title">WSPR BAND ACTIVITY REPORT — SELECTED PATH</div>
+      <div class="wspr-meta" id="wsprMeta">Select two cities and calculate to check live recent WSPR reports.</div>
     </div>
     <div class="wspr-actions">
+      <div class="wspr-radius-control">
+        <label for="wsprRadius" style="margin:0;">Endpoint radius</label>
+        <div class="select-wrapper">
+          <select id="wsprRadius" onchange="refreshWsprBandActivity()">
+            <option selected value="1200">1,200 km</option>
+            <option value="600">600 km</option>
+            <option value="300">300 km</option>
+            <option value="200">200 km</option>
+            <option value="100">100 km</option>
+            <option value="50">50 km</option>
+          </select>
+        </div>
+      </div>
       <button class="mini-btn" type="button" onclick="refreshWsprBandActivity()">REFRESH WSPR</button>
     </div>
   </div>
   <div class="wspr-status" id="wsprStatus">Waiting for selected path.</div>
   <div class="wspr-band-grid" id="wsprBandGrid"></div>
   <div class="wspr-disclaimer">
-    Source: wsprnet.org spot reports via wspr.live. The card shows recent WSPR activity near the selected city endpoints in either direction. It is band guidance from observed low-power beacon reports, not a forecast or contact guarantee.
+    Source: wsprnet.org spot reports via wspr.live. The report always uses live current UTC and shows recent WSPR activity near the selected city endpoints in either direction. It is band guidance from observed low-power beacon reports, not a forecast or contact guarantee.
   </div>
 </div>
 
@@ -1810,7 +1840,7 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
       <button class="mini-btn" type="button" id="btnMapCalc" onclick="recalculateMapView()">CALCULATE</button>
     </div>
     <div class="map-toolbar-right">
-      <button class="mini-btn" type="button" id="btnMapPlay" onclick="toggleMapPlayback()">PLAY</button>
+      <button class="mini-btn" type="button" id="btnMapPlay" onclick="toggleMapPlayback()">PAUSED</button>
     </div>
     <div class="map-legend">
       <div class="legend-item"><div class="legend-swatch" style="background:var(--accent)"></div><span>Short path</span></div>
@@ -4059,8 +4089,13 @@ const WSPR_BANDS = [
   { band: 28, label: '10m' },
   { band: 50, label: '6m' }
 ];
-const WSPR_ENDPOINT_RADIUS_KM = 1200;
 let wsprRequestSeq = 0;
+
+function getWsprEndpointRadiusKm() {
+  const el = document.getElementById('wsprRadius');
+  const value = Number(el?.value || 1200);
+  return Number.isFinite(value) && value > 0 ? value : 1200;
+}
 
 function getWsprConfidence(spots, txCount, rxCount) {
   if (spots >= 12 && txCount >= 3 && rxCount >= 3) return 'high';
@@ -4105,7 +4140,7 @@ function buildWsprQuery(cityA, cityB) {
   const aLon = sqlNumber(cityA.lon);
   const bLat = sqlNumber(cityB.lat);
   const bLon = sqlNumber(cityB.lon);
-  const radiusM = Math.round(WSPR_ENDPOINT_RADIUS_KM * 1000);
+  const radiusM = Math.round(getWsprEndpointRadiusKm() * 1000);
   const bandList = WSPR_BANDS.map(b => b.band).join(',');
 
   return `
@@ -4180,8 +4215,9 @@ function renderWsprResults(cityA, cityB, bandMap) {
   const nowText = `${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')} UTC`;
   const gridA = maidenhead(cityA.lat, cityA.lon, 6).toUpperCase();
   const gridB = maidenhead(cityB.lat, cityB.lon, 6).toUpperCase();
+  const radiusKm = getWsprEndpointRadiusKm();
 
-  meta.textContent = `${cityA.city || cityA.name} (${gridA}) ↔ ${cityB.city || cityB.name} (${gridB}) · last 30 minutes · endpoint radius ${WSPR_ENDPOINT_RADIUS_KM.toLocaleString()} km · refreshed ${nowText}`;
+  meta.textContent = `${cityA.city || cityA.name} (${gridA}) ↔ ${cityB.city || cityB.name} (${gridB}) · live UTC now · last 30 minutes · endpoint radius ${radiusKm.toLocaleString()} km · refreshed ${nowText}`;
   status.innerHTML = activeBands.length
     ? `<strong>${activeBands.length}</strong> band${activeBands.length === 1 ? '' : 's'} with recent WSPR reports · ${totalSpots.toLocaleString()} spot${totalSpots === 1 ? '' : 's'} · confidence: <strong>${confidence.toUpperCase()}</strong>`
     : `No matching WSPR reports found in the last 30 minutes for the selected endpoint areas. Confidence: <strong>LOW</strong>`;
@@ -4217,15 +4253,15 @@ async function refreshWsprBandActivity() {
   const status = document.getElementById('wsprStatus');
   const meta = document.getElementById('wsprMeta');
   if (!sel) {
-    if (meta) meta.textContent = 'Select two cities and calculate to check recent WSPR reports.';
+    if (meta) meta.textContent = 'Select two cities and calculate to check live recent WSPR reports.';
     if (status) status.textContent = 'Waiting for selected path.';
     renderWsprBandPlaceholders('Waiting for path');
     return;
   }
 
   const seq = ++wsprRequestSeq;
-  if (meta) meta.textContent = `${sel.cityA.city || sel.cityA.name} ↔ ${sel.cityB.city || sel.cityB.name} · querying wspr.live`;
-  if (status) status.textContent = 'Loading recent WSPR activity from wspr.live...';
+  if (meta) meta.textContent = `${sel.cityA.city || sel.cityA.name} ↔ ${sel.cityB.city || sel.cityB.name} · live UTC now · endpoint radius ${getWsprEndpointRadiusKm().toLocaleString()} km · querying wspr.live`;
+  if (status) status.textContent = 'Loading live recent WSPR activity from wspr.live...';
   renderWsprBandPlaceholders('Checking wspr.live');
 
   try {
@@ -4241,7 +4277,7 @@ async function refreshWsprBandActivity() {
     renderWsprResults(sel.cityA, sel.cityB, wsprRowsToMap(json));
   } catch (err) {
     if (seq !== wsprRequestSeq) return;
-    if (meta) meta.textContent = `${sel.cityA.city || sel.cityA.name} ↔ ${sel.cityB.city || sel.cityB.name} · wspr.live request failed`;
+    if (meta) meta.textContent = `${sel.cityA.city || sel.cityA.name} ↔ ${sel.cityB.city || sel.cityB.name} · live UTC now · wspr.live request failed`;
     if (status) status.innerHTML = 'Unable to load WSPR data now. The external wspr.live service may be unavailable, rate-limited, or blocked by the browser.';
     renderWsprBandPlaceholders('WSPR unavailable');
     console.warn('WSPR query failed:', err);
@@ -4774,6 +4810,7 @@ function runBestDates() {
 
   document.getElementById('bestDatesResults').classList.add('visible');
   document.getElementById('bestDatesResults').scrollIntoView({behavior:'smooth', block:'start'});
+  refreshWsprBandActivity();
 }
 
 function loadDateAndCities(dateStr, cityAName, cityBName, autoBestWindow = false) {
@@ -5464,9 +5501,9 @@ function applyUtcMinuteDelta(deltaMinutes) {
 function updatePlaybackUi() {
   const btn = document.getElementById('btnMapPlay');
   if (!btn) return;
-  btn.textContent = mapState.isPlaying ? 'PAUSE' : 'PLAY';
+  btn.textContent = mapState.isPlaying ? 'PLAYING' : 'PAUSED';
   btn.setAttribute('aria-pressed', mapState.isPlaying ? 'true' : 'false');
-  btn.title = mapState.isPlaying ? 'Pause live playback' : 'Start live playback';
+  btn.title = mapState.isPlaying ? 'Map animation is playing; click to pause' : 'Map animation is paused; click to play';
 }
 function stopMapPlayback() {
   if (mapState.playTimer) clearInterval(mapState.playTimer);
@@ -5663,6 +5700,7 @@ function snapMapToBestWindow() {
   if (mapState.bestHour == null || Number.isNaN(mapState.bestHour)) return;
   mapState.utcHour = mapState.bestHour;
   renderMercatorMap(false);
+  refreshWsprBandActivity();
 }
 function midpointOfOverlap(ov) {
   if (!ov) return null;
