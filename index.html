@@ -17,6 +17,7 @@ Grey-Line tool for understanding grey-line radio propagation opportunities betwe
   - Dawn / Sunrise / Sunset / Dusk
   - Overlap windows between stations
 - “Best Dates” and “Best Window” analysis tools
+- Fully client-side in a browser (no server required)
 ---
 
 Notes for future maintenance:
@@ -1445,6 +1446,93 @@ grey-line release 1.2
     margin-top:6px;
   }
 
+  /* WSPR live band activity */
+  .wspr-card {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 24px;
+    margin-bottom: 16px;
+    animation: fadeIn 0.5s ease;
+  }
+  .wspr-card.visible { display: block; }
+  .wspr-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .wspr-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--green);
+    text-transform: uppercase;
+  }
+  .wspr-meta {
+    margin-top: 6px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .wspr-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .wspr-status strong { color: var(--green); }
+  .wspr-band-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .wspr-band {
+    background: #030c14;
+    border: 1px solid rgba(26,64,96,0.72);
+    border-radius: 6px;
+    padding: 11px 12px;
+    min-height: 92px;
+  }
+  .wspr-band.open {
+    border-color: rgba(0,255,157,0.45);
+    background: rgba(0,255,157,0.045);
+  }
+  .wspr-band-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    color: var(--text);
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .wspr-band-state {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .wspr-band.open .wspr-band-state strong { color: var(--green); }
+  .wspr-disclaimer {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(26,64,96,0.7);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+  .wspr-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
 </style>
 </head>
 <body>
@@ -1482,12 +1570,13 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
 <p>Press <strong>🔍 Scan All Cities</strong> to rank every city in the database by overlap duration against your Station Alpha — useful for finding the best DX targets on a given date.</p>
 <p>You can narrow the search by using the <strong>MIN OVERLAP</strong> lever which sets the minimum duration of overlap. Press the scan button again to close the scan report.</p>
 <p>Press <strong>📅 Best Dates</strong> to see which months of the year offer overlap for the selected city pair — helpful for planning ahead. Press it again to close the report.</p>
+<p>The <strong>WSPR Band Activity</strong> card checks recent WSPR spots for the selected city pair. It uses the selected path endpoints and reports bands with matching activity in the last 30 minutes. WSPR activity is evidence of recent low-power beacon reception near the selected path endpoints, not a guarantee that voice, data, or every station setup will work.</p>
 <p>After changing any option that affects the map and timeline bars, remember to press <strong>⚡ CALCULATE</strong>.</p>
 <div class="disclaimer">
   Developed by John Loftus (VK4CT)<br/>
   Technical assistance: OpenAI<br/><br/>
   Copyright <span class="copyright-symbol">©</span> CC BY NC SA<br/><br/>
-  ⚠ DISCLAIMER — This tool is provided for reference purposes only. Solar times are calculated from astronomical algorithms and are approximate. Actual HF propagation depends on many additional factors including solar flux, geomagnetic conditions, antenna gain, and operating frequency. The RPR does not forecast propagation conditions and makes no guarantee of contact success.
+  ⚠ DISCLAIMER — This tool is provided for reference purposes only. Solar times are calculated from astronomical algorithms and are approximate. WSPR data is raw third-party spot data and may include duplicates, false spots, missing reports, or reporting delays. Actual HF propagation depends on many additional factors including solar flux, geomagnetic conditions, antenna gain, mode, power, noise, and operating frequency. The RPR does not forecast propagation conditions and makes no guarantee of contact success.
 </div>
 </div>
 <!-- UTC Clock bar -->
@@ -1684,8 +1773,26 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
         <div id="azLongBtoA_card" style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);margin-top:4px;">—</div>
       </div>
     </div>
-  </div>
 </div>
+</div>
+</div>
+
+<!-- WSPR live activity card -->
+<div class="wspr-card" id="wsprCard">
+  <div class="wspr-head">
+    <div>
+      <div class="wspr-title">WSPR BAND ACTIVITY — SELECTED PATH</div>
+      <div class="wspr-meta" id="wsprMeta">Select two cities and calculate to check recent WSPR reports.</div>
+    </div>
+    <div class="wspr-actions">
+      <button class="mini-btn" type="button" onclick="refreshWsprBandActivity()">REFRESH WSPR</button>
+    </div>
+  </div>
+  <div class="wspr-status" id="wsprStatus">Waiting for selected path.</div>
+  <div class="wspr-band-grid" id="wsprBandGrid"></div>
+  <div class="wspr-disclaimer">
+    Source: wsprnet.org spot reports via wspr.live. The card shows recent WSPR activity near the selected city endpoints in either direction. It is band guidance from observed low-power beacon reports, not a forecast or contact guarantee.
+  </div>
 </div>
 
 <!-- Mercator map panel -->
@@ -3938,6 +4045,209 @@ function maidenhead(lat, lon, precision=6) {
   return res;
 }
 
+// ─── WSPR live band activity ─────────────────────────────────────
+const WSPR_BANDS = [
+  { band: 1, label: '160m' },
+  { band: 3, label: '80m' },
+  { band: 5, label: '60m' },
+  { band: 7, label: '40m' },
+  { band: 10, label: '30m' },
+  { band: 14, label: '20m' },
+  { band: 18, label: '17m' },
+  { band: 21, label: '15m' },
+  { band: 24, label: '12m' },
+  { band: 28, label: '10m' },
+  { band: 50, label: '6m' }
+];
+const WSPR_ENDPOINT_RADIUS_KM = 1200;
+let wsprRequestSeq = 0;
+
+function getWsprConfidence(spots, txCount, rxCount) {
+  if (spots >= 12 && txCount >= 3 && rxCount >= 3) return 'high';
+  if (spots >= 4 && txCount >= 2 && rxCount >= 2) return 'medium';
+  if (spots > 0) return 'low';
+  return 'none';
+}
+
+function getWsprSelection() {
+  const contA = document.getElementById('contA')?.value;
+  const cityAName = document.getElementById('cityA')?.value;
+  const contB = document.getElementById('contB')?.value;
+  const cityBName = document.getElementById('cityB')?.value;
+  if (!contA || !cityAName || !contB || !cityBName) return null;
+
+  const cityA = CITIES[contA]?.find(c => c.name === cityAName);
+  const cityB = CITIES[contB]?.find(c => c.name === cityBName);
+  if (!cityA || !cityB) return null;
+  return { cityA, cityB, cityAName, cityBName };
+}
+
+function showWsprCard() {
+  document.getElementById('wsprCard')?.classList.add('visible');
+}
+
+function renderWsprBandPlaceholders(message) {
+  const grid = document.getElementById('wsprBandGrid');
+  if (!grid) return;
+  grid.innerHTML = WSPR_BANDS.map(b => `
+    <div class="wspr-band">
+      <div class="wspr-band-name">${b.label}</div>
+      <div class="wspr-band-state">${message}</div>
+    </div>`).join('');
+}
+
+function sqlNumber(n) {
+  return Number(n).toFixed(6);
+}
+
+function buildWsprQuery(cityA, cityB) {
+  const aLat = sqlNumber(cityA.lat);
+  const aLon = sqlNumber(cityA.lon);
+  const bLat = sqlNumber(cityB.lat);
+  const bLon = sqlNumber(cityB.lon);
+  const radiusM = Math.round(WSPR_ENDPOINT_RADIUS_KM * 1000);
+  const bandList = WSPR_BANDS.map(b => b.band).join(',');
+
+  return `
+SELECT
+  band,
+  count() AS spots,
+  toString(max(time)) AS latest_utc,
+  max(snr) AS best_snr,
+  uniq(tx_sign) AS tx_count,
+  uniq(rx_sign) AS rx_count,
+  argMax(tx_sign, time) AS latest_tx,
+  argMax(rx_sign, time) AS latest_rx,
+  argMax(tx_loc, time) AS latest_tx_loc,
+  argMax(rx_loc, time) AS latest_rx_loc,
+  argMax(distance, time) AS latest_distance
+FROM wspr.rx
+WHERE
+  time >= subtractMinutes(now(), 30)
+  AND band IN (${bandList})
+  AND (
+    (
+      greatCircleDistance(tx_lon, tx_lat, ${aLon}, ${aLat}) <= ${radiusM}
+      AND greatCircleDistance(rx_lon, rx_lat, ${bLon}, ${bLat}) <= ${radiusM}
+    )
+    OR
+    (
+      greatCircleDistance(tx_lon, tx_lat, ${bLon}, ${bLat}) <= ${radiusM}
+      AND greatCircleDistance(rx_lon, rx_lat, ${aLon}, ${aLat}) <= ${radiusM}
+    )
+  )
+GROUP BY band
+ORDER BY band
+FORMAT JSONCompact`.trim();
+}
+
+function wsprRowsToMap(json) {
+  const rows = json && Array.isArray(json.data) ? json.data : [];
+  const map = new Map();
+  rows.forEach(row => {
+    const band = Number(row[0]);
+    map.set(band, {
+      band,
+      spots: Number(row[1] || 0),
+      latestUtc: row[2] || '',
+      bestSnr: Number(row[3] || 0),
+      txCount: Number(row[4] || 0),
+      rxCount: Number(row[5] || 0),
+      latestTx: row[6] || '',
+      latestRx: row[7] || '',
+      latestTxLoc: row[8] || '',
+      latestRxLoc: row[9] || '',
+      latestDistance: Number(row[10] || 0)
+    });
+  });
+  return map;
+}
+
+function renderWsprResults(cityA, cityB, bandMap) {
+  const grid = document.getElementById('wsprBandGrid');
+  const status = document.getElementById('wsprStatus');
+  const meta = document.getElementById('wsprMeta');
+  if (!grid || !status || !meta) return;
+
+  const totalSpots = [...bandMap.values()].reduce((sum, r) => sum + r.spots, 0);
+  const activeBands = WSPR_BANDS.filter(b => bandMap.has(b.band));
+  const confidence = getWsprConfidence(
+    totalSpots,
+    [...bandMap.values()].reduce((sum, r) => sum + r.txCount, 0),
+    [...bandMap.values()].reduce((sum, r) => sum + r.rxCount, 0)
+  );
+  const now = new Date();
+  const nowText = `${String(now.getUTCHours()).padStart(2,'0')}:${String(now.getUTCMinutes()).padStart(2,'0')} UTC`;
+  const gridA = maidenhead(cityA.lat, cityA.lon, 6).toUpperCase();
+  const gridB = maidenhead(cityB.lat, cityB.lon, 6).toUpperCase();
+
+  meta.textContent = `${cityA.city || cityA.name} (${gridA}) ↔ ${cityB.city || cityB.name} (${gridB}) · last 30 minutes · endpoint radius ${WSPR_ENDPOINT_RADIUS_KM.toLocaleString()} km · refreshed ${nowText}`;
+  status.innerHTML = activeBands.length
+    ? `<strong>${activeBands.length}</strong> band${activeBands.length === 1 ? '' : 's'} with recent WSPR reports · ${totalSpots.toLocaleString()} spot${totalSpots === 1 ? '' : 's'} · confidence: <strong>${confidence.toUpperCase()}</strong>`
+    : `No matching WSPR reports found in the last 30 minutes for the selected endpoint areas. Confidence: <strong>LOW</strong>`;
+
+  grid.innerHTML = WSPR_BANDS.map(b => {
+    const r = bandMap.get(b.band);
+    if (!r) {
+      return `
+        <div class="wspr-band">
+          <div class="wspr-band-name">${b.label}</div>
+          <div class="wspr-band-state">No matching reports<br>in last 30 min</div>
+        </div>`;
+    }
+    const bandConfidence = getWsprConfidence(r.spots, r.txCount, r.rxCount).toUpperCase();
+    return `
+      <div class="wspr-band open">
+        <div class="wspr-band-name">${b.label}</div>
+        <div class="wspr-band-state">
+          <strong>${r.spots.toLocaleString()} spot${r.spots === 1 ? '' : 's'}</strong><br>
+          Latest ${String(r.latestUtc).slice(11,16)} UTC<br>
+          Best SNR ${r.bestSnr} dB<br>
+          ${r.latestTx || '?'} → ${r.latestRx || '?'}<br>
+          Confidence ${bandConfidence}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function refreshWsprBandActivity() {
+  const sel = getWsprSelection();
+  showWsprCard();
+
+  const status = document.getElementById('wsprStatus');
+  const meta = document.getElementById('wsprMeta');
+  if (!sel) {
+    if (meta) meta.textContent = 'Select two cities and calculate to check recent WSPR reports.';
+    if (status) status.textContent = 'Waiting for selected path.';
+    renderWsprBandPlaceholders('Waiting for path');
+    return;
+  }
+
+  const seq = ++wsprRequestSeq;
+  if (meta) meta.textContent = `${sel.cityA.city || sel.cityA.name} ↔ ${sel.cityB.city || sel.cityB.name} · querying wspr.live`;
+  if (status) status.textContent = 'Loading recent WSPR activity from wspr.live...';
+  renderWsprBandPlaceholders('Checking wspr.live');
+
+  try {
+    const query = buildWsprQuery(sel.cityA, sel.cityB);
+    const url = 'https://db1.wspr.live/?query=' + encodeURIComponent(query);
+    const response = await fetch(url, { method: 'GET' });
+    if (seq !== wsprRequestSeq) return;
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+    const json = await response.json();
+    renderWsprResults(sel.cityA, sel.cityB, wsprRowsToMap(json));
+  } catch (err) {
+    if (seq !== wsprRequestSeq) return;
+    if (meta) meta.textContent = `${sel.cityA.city || sel.cityA.name} ↔ ${sel.cityB.city || sel.cityB.name} · wspr.live request failed`;
+    if (status) status.innerHTML = 'Unable to load WSPR data now. The external wspr.live service may be unavailable, rate-limited, or blocked by the browser.';
+    renderWsprBandPlaceholders('WSPR unavailable');
+    console.warn('WSPR query failed:', err);
+  }
+}
+
 function expandWindowWrapped(s, e, pct) {
   const r = toRangeHours(s, e);
   if(!r) return null;
@@ -4102,6 +4412,7 @@ function calculate() {
   const btnPrint = document.getElementById('btnPrint'); if (btnPrint) btnPrint.style.display = 'block';
   const bestEl = document.getElementById('bestDatesResults'); if (bestEl) bestEl.classList.remove('visible');
   const scanEl = document.getElementById('scanResults'); if (scanEl) scanEl.classList.remove('visible');
+  refreshWsprBandActivity();
   if (resultsEl && typeof resultsEl.scrollIntoView === 'function') resultsEl.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
