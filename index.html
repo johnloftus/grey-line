@@ -773,7 +773,7 @@ grey-line release 1.2
   .btn-print span { position:relative; z-index:1; }
 
   /* ── Print styles ── */
-  @media print {
+@media print {
     body { background: #fff !important; color: #000 !important; }
     body::before { display:none; }
     .btn-calculate, .btn-scan, .btn-bestdates, .btn-print,
@@ -794,6 +794,7 @@ grey-line release 1.2
     .timeline-track { overflow: visible !important; }
     .timeline-section, .timeline-track, .grey-bar, .overlap-bar, .month-overlap-fill, .mins-bar { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     .utc-note { color: #666 !important; }
+    body:not(.daily-print-mode) .daily-matrix-card { display:none !important; }
     .print-header {
       display: block !important;
       text-align: center;
@@ -802,6 +803,34 @@ grey-line release 1.2
     }
   }
   .print-header { display: none; }
+  @media print {
+    body.daily-print-mode .container > * {
+      display: none !important;
+    }
+    body.daily-print-mode .container > .print-header,
+    body.daily-print-mode .container > #results {
+      display: block !important;
+    }
+    body.daily-print-mode #results > *:not(#dailyWsprMatrixCard) {
+      display: none !important;
+    }
+    body.daily-print-mode #dailyWsprMatrixCard {
+      display: block !important;
+      background: #fff !important;
+      border-color: #bbb !important;
+      color: #000 !important;
+    }
+    body.daily-print-mode .daily-actions,
+    body.daily-print-mode .daily-config,
+    body.daily-print-mode .daily-fav-manager {
+      display: none !important;
+    }
+    body.daily-print-mode .daily-matrix-table th,
+    body.daily-print-mode .daily-matrix-table td {
+      color: #000 !important;
+      border-color: #bbb !important;
+    }
+  }
 
   /* Best Dates button */
   .btn-bestdates {
@@ -1549,6 +1578,102 @@ grey-line release 1.2
     padding: 8px 30px 8px 10px;
     font-size: 11px;
   }
+  .daily-matrix-card {
+    display: block;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 24px;
+    margin-bottom: 16px;
+    animation: fadeIn 0.5s ease;
+  }
+  .daily-config {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    align-items: end;
+    margin: 14px 0;
+  }
+  @media (max-width: 900px) {
+    .daily-config { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 620px) {
+    .daily-config { grid-template-columns: 1fr; }
+  }
+  .daily-fav-manager {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 10px 0 14px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .daily-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+  }
+  .daily-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 10px 0;
+  }
+  .daily-status strong { color: var(--green); }
+  .daily-table-wrap {
+    overflow-x: auto;
+    border: 1px solid rgba(26,64,96,0.65);
+    border-radius: 8px;
+    background: #030c14;
+    margin-top: 12px;
+  }
+  .daily-matrix-table {
+    width: 100%;
+    min-width: 980px;
+    border-collapse: collapse;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+  .daily-matrix-table th,
+  .daily-matrix-table td {
+    border: 1px solid rgba(26,64,96,0.55);
+    padding: 5px 6px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .daily-matrix-table th {
+    color: var(--muted);
+    background: rgba(13,32,53,0.9);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .daily-matrix-table .slot-cell {
+    color: var(--text);
+    background: rgba(0,0,0,0.22);
+    font-weight: 700;
+  }
+  .daily-matrix-table .path1-head { color: var(--accent); }
+  .daily-matrix-table .path2-head { color: var(--accent2); }
+  .daily-cell {
+    color: rgba(200,232,248,0.5);
+    background: rgba(255,255,255,0.015);
+  }
+  .daily-cell.has-spots {
+    color: #06110d;
+    font-weight: 700;
+  }
+  .daily-note {
+    margin-top: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
 
 </style>
 </head>
@@ -1588,6 +1713,7 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
 <p>You can narrow the search by using the <strong>MIN OVERLAP</strong> lever which sets the minimum duration of overlap. Press the scan button again to close the scan report.</p>
 <p>Press <strong>📅 Best Dates</strong> to see which months of the year offer overlap for the selected city pair — helpful for planning ahead. Press it again to close the report.</p>
 <p>The <strong>WSPR Band Activity Report</strong> card checks live recent WSPR spots for the selected city pair. It always uses current UTC from wspr.live, independent of the grey-line planning date, and reports bands with matching activity in the last 30 minutes. WSPR activity is evidence of recent low-power beacon reception near the selected path endpoints, not a guarantee that voice, data, or every station setup will work.</p>
+<p>The <strong>Daily WSPR Path Matrix</strong> is for pattern study. Save favourite paths from the current city pair, choose two saved paths, select a UTC date and endpoint radius, then press <strong>BUILD DAILY TABLE</strong>. The report queries wspr.live historical spots for that date, groups activity into 30-minute UTC slots, and can be exported as CSV or printed/saved as PDF.</p>
 <p>After changing any option that affects the map and timeline bars, remember to press <strong>⚡ CALCULATE</strong>.</p>
 <div class="disclaimer">
   Developed by John Loftus (VK4CT)<br/>
@@ -1806,6 +1932,7 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
         <label for="wsprRadius" style="margin:0;">Endpoint radius</label>
         <div class="select-wrapper">
           <select id="wsprRadius" onchange="refreshWsprBandActivity()">
+            <option value="1800">1,800 km</option>
             <option selected value="1200">1,200 km</option>
             <option value="600">600 km</option>
             <option value="300">300 km</option>
@@ -1822,6 +1949,67 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
   <div class="wspr-band-grid" id="wsprBandGrid"></div>
   <div class="wspr-disclaimer">
     Source: wsprnet.org spot reports via wspr.live. The report always uses live current UTC and shows recent WSPR activity near the selected city endpoints in either direction. It is band guidance from observed low-power beacon reports, not a forecast or contact guarantee.
+  </div>
+</div>
+
+<!-- Daily WSPR path matrix -->
+<div class="daily-matrix-card" id="dailyWsprMatrixCard">
+  <div class="wspr-head">
+    <div>
+      <div class="wspr-title">DAILY WSPR PATH MATRIX</div>
+      <div class="wspr-meta" id="dailyWsprMeta">Build a 30-minute activity table for two saved paths.</div>
+    </div>
+  </div>
+
+  <div class="daily-fav-manager">
+    <button class="mini-btn" type="button" onclick="saveCurrentPathAsFavorite()">SAVE CURRENT PATH</button>
+    <button class="mini-btn" type="button" onclick="deleteSelectedFavoritePath()">DELETE SELECTED PATH</button>
+    <span id="favoritePathStatus">Favourite paths are stored in this browser.</span>
+  </div>
+
+  <div class="daily-config">
+    <div>
+      <label for="dailyPath1">Path 1</label>
+      <div class="select-wrapper">
+        <select id="dailyPath1"></select>
+      </div>
+    </div>
+    <div>
+      <label for="dailyPath2">Path 2</label>
+      <div class="select-wrapper">
+        <select id="dailyPath2"></select>
+      </div>
+    </div>
+    <div>
+      <label for="dailyMatrixDate">Date UTC</label>
+      <input id="dailyMatrixDate" type="date"/>
+    </div>
+    <div>
+      <label for="dailyMatrixRadius">Endpoint radius</label>
+      <div class="select-wrapper">
+        <select id="dailyMatrixRadius">
+          <option value="1800">1,800 km</option>
+          <option selected value="1200">1,200 km</option>
+          <option value="600">600 km</option>
+          <option value="300">300 km</option>
+          <option value="200">200 km</option>
+          <option value="100">100 km</option>
+          <option value="50">50 km</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="daily-actions">
+    <button class="mini-btn" type="button" onclick="buildDailyWsprMatrix()">BUILD DAILY TABLE</button>
+    <button class="mini-btn" type="button" onclick="exportDailyWsprCsv()">EXPORT CSV</button>
+    <button class="mini-btn" type="button" onclick="printDailyWsprMatrix()">PRINT / PDF</button>
+  </div>
+
+  <div class="daily-status" id="dailyWsprStatus">Save favourite paths, select Path 1 and Path 2, then build the daily table.</div>
+  <div class="daily-table-wrap" id="dailyWsprTableWrap"></div>
+  <div class="daily-note">
+    The daily matrix queries historical WSPR spots for the selected UTC date and groups them into 30-minute slots. Counts are observed WSPR reports near each path endpoint, not a propagation forecast.
   </div>
 </div>
 
@@ -3787,6 +3975,8 @@ window.onload = function() {
   document.getElementById('datePicker').addEventListener('change', handleManualDateEdit);
   document.getElementById('datePicker').addEventListener('input', handleManualDateEdit);
   syncDisplayedMapDateFromPicker();
+  const dailyDate = document.getElementById('dailyMatrixDate');
+  if (dailyDate) dailyDate.value = `${y}-${m}-${d}`;
 
 
   // Grey-line expansion label
@@ -3814,6 +4004,7 @@ window.onload = function() {
   } catch(e) {}
 
   updateScanScopeHint();
+  initializeDailyWsprTools();
 };
 
 
@@ -4282,6 +4473,356 @@ async function refreshWsprBandActivity() {
     renderWsprBandPlaceholders('WSPR unavailable');
     console.warn('WSPR query failed:', err);
   }
+}
+
+// ─── Daily WSPR path matrix ──────────────────────────────────────
+const DAILY_WSPR_FAVORITES_KEY = 'rprWsprFavoritePathsV1';
+const DAILY_WSPR_BANDS = WSPR_BANDS.filter(b => ![5, 50].includes(b.band));
+let dailyWsprLastReport = null;
+
+function getFavoritePaths() {
+  try {
+    const raw = localStorage.getItem(DAILY_WSPR_FAVORITES_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(isValidFavoritePath) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveFavoritePaths(paths) {
+  localStorage.setItem(DAILY_WSPR_FAVORITES_KEY, JSON.stringify(paths));
+}
+
+function isValidFavoritePath(path) {
+  return path && path.id && path.a && path.b &&
+         path.a.cont && path.a.name && path.b.cont && path.b.name;
+}
+
+function findCityByRef(ref) {
+  return CITIES[ref?.cont]?.find(c => c.name === ref.name) || null;
+}
+
+function pathLabel(path) {
+  const a = findCityByRef(path.a);
+  const b = findCityByRef(path.b);
+  const aName = a?.city || path.a.name.split(',')[0];
+  const bName = b?.city || path.b.name.split(',')[0];
+  return `${aName} <> ${bName}`;
+}
+
+function getCurrentPathFavoriteCandidate() {
+  const contA = document.getElementById('contA')?.value;
+  const cityAName = document.getElementById('cityA')?.value;
+  const contB = document.getElementById('contB')?.value;
+  const cityBName = document.getElementById('cityB')?.value;
+  if (!contA || !cityAName || !contB || !cityBName) return null;
+
+  const path = {
+    id: `${contA}|${cityAName}|${contB}|${cityBName}`,
+    a: { cont: contA, name: cityAName },
+    b: { cont: contB, name: cityBName }
+  };
+  path.label = pathLabel(path);
+  return path;
+}
+
+function initializeDailyWsprTools() {
+  refreshFavoritePathSelectors();
+}
+
+function refreshFavoritePathSelectors(preferredId = null) {
+  const paths = getFavoritePaths();
+  const selects = [document.getElementById('dailyPath1'), document.getElementById('dailyPath2')].filter(Boolean);
+  const previous = new Map(selects.map(sel => [sel.id, sel.value]));
+
+  selects.forEach((sel, index) => {
+    sel.innerHTML = '';
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = paths.length ? '— Select saved path —' : '— Save a path first —';
+    sel.appendChild(empty);
+
+    paths.forEach(path => {
+      const opt = document.createElement('option');
+      opt.value = path.id;
+      opt.textContent = path.label || pathLabel(path);
+      sel.appendChild(opt);
+    });
+
+    const desired = preferredId || previous.get(sel.id) || (index === 0 ? paths[0]?.id : paths[1]?.id);
+    if (desired && paths.some(p => p.id === desired)) sel.value = desired;
+  });
+
+  const status = document.getElementById('favoritePathStatus');
+  if (status) status.textContent = paths.length
+    ? `${paths.length} favourite path${paths.length === 1 ? '' : 's'} saved in this browser.`
+    : 'Favourite paths are stored in this browser.';
+}
+
+function saveCurrentPathAsFavorite() {
+  const candidate = getCurrentPathFavoriteCandidate();
+  const status = document.getElementById('favoritePathStatus');
+  if (!candidate) {
+    if (status) status.textContent = 'Select both stations and calculate before saving a favourite path.';
+    return;
+  }
+
+  const paths = getFavoritePaths();
+  const exists = paths.some(p => p.id === candidate.id);
+  if (!exists) {
+    paths.push(candidate);
+    paths.sort((a, b) => (a.label || pathLabel(a)).localeCompare(b.label || pathLabel(b)));
+    saveFavoritePaths(paths);
+  }
+  refreshFavoritePathSelectors(candidate.id);
+  if (status) status.textContent = exists ? 'That path is already saved.' : `Saved ${candidate.label}.`;
+}
+
+function deleteSelectedFavoritePath() {
+  const sel1 = document.getElementById('dailyPath1');
+  const sel2 = document.getElementById('dailyPath2');
+  const id = sel1?.value || sel2?.value;
+  const status = document.getElementById('favoritePathStatus');
+  if (!id) {
+    if (status) status.textContent = 'Select a saved path before deleting.';
+    return;
+  }
+
+  const paths = getFavoritePaths();
+  const path = paths.find(p => p.id === id);
+  saveFavoritePaths(paths.filter(p => p.id !== id));
+  refreshFavoritePathSelectors();
+  if (status) status.textContent = path ? `Deleted ${path.label || pathLabel(path)}.` : 'Saved path deleted.';
+}
+
+function getSelectedDailyPath(selectId) {
+  const id = document.getElementById(selectId)?.value;
+  if (!id) return null;
+  const path = getFavoritePaths().find(p => p.id === id);
+  if (!path) return null;
+  const cityA = findCityByRef(path.a);
+  const cityB = findCityByRef(path.b);
+  if (!cityA || !cityB) return null;
+  return { ...path, cityA, cityB, label: path.label || pathLabel(path) };
+}
+
+function getDailyMatrixRadiusKm() {
+  const value = Number(document.getElementById('dailyMatrixRadius')?.value || 1200);
+  return Number.isFinite(value) && value > 0 ? value : 1200;
+}
+
+function buildDailyWsprQuery(path, dateStr, radiusKm) {
+  const aLat = sqlNumber(path.cityA.lat);
+  const aLon = sqlNumber(path.cityA.lon);
+  const bLat = sqlNumber(path.cityB.lat);
+  const bLon = sqlNumber(path.cityB.lon);
+  const radiusM = Math.round(radiusKm * 1000);
+  const bandList = DAILY_WSPR_BANDS.map(b => b.band).join(',');
+  const start = `${dateStr} 00:00:00`;
+
+  return `
+SELECT
+  intDiv(toHour(time) * 60 + toMinute(time), 30) AS slot,
+  band,
+  count() AS spots
+FROM wspr.rx
+WHERE
+  time >= toDateTime('${start}', 'UTC')
+  AND time < toDateTime('${start}', 'UTC') + INTERVAL 1 DAY
+  AND band IN (${bandList})
+  AND (
+    (
+      greatCircleDistance(tx_lon, tx_lat, ${aLon}, ${aLat}) <= ${radiusM}
+      AND greatCircleDistance(rx_lon, rx_lat, ${bLon}, ${bLat}) <= ${radiusM}
+    )
+    OR
+    (
+      greatCircleDistance(tx_lon, tx_lat, ${bLon}, ${bLat}) <= ${radiusM}
+      AND greatCircleDistance(rx_lon, rx_lat, ${aLon}, ${aLat}) <= ${radiusM}
+    )
+  )
+GROUP BY slot, band
+ORDER BY slot, band
+FORMAT JSONCompact`.trim();
+}
+
+async function fetchDailyPathMatrix(path, dateStr, radiusKm) {
+  const query = buildDailyWsprQuery(path, dateStr, radiusKm);
+  const url = 'https://db1.wspr.live/?query=' + encodeURIComponent(query);
+  const response = await fetch(url, { method: 'GET' });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || `HTTP ${response.status}`);
+  }
+  const json = await response.json();
+  const matrix = Array.from({ length: 48 }, () => new Map());
+  (json.data || []).forEach(row => {
+    const slot = Number(row[0]);
+    const band = Number(row[1]);
+    const spots = Number(row[2] || 0);
+    if (slot >= 0 && slot < 48) matrix[slot].set(band, spots);
+  });
+  return matrix;
+}
+
+function slotLabel(slot) {
+  const mins = slot * 30;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+}
+
+function dailyCellStyle(count, maxCount, pathIndex) {
+  if (!count) return '';
+  const strength = maxCount > 0 ? Math.max(0.18, Math.min(0.9, count / maxCount)) : 0.25;
+  const rgb = pathIndex === 1 ? '0,200,255' : '255,106,0';
+  return ` style="background:rgba(${rgb},${strength.toFixed(2)})"`;
+}
+
+function renderDailyWsprMatrix(report) {
+  const wrap = document.getElementById('dailyWsprTableWrap');
+  const status = document.getElementById('dailyWsprStatus');
+  const meta = document.getElementById('dailyWsprMeta');
+  if (!wrap || !status || !meta) return;
+
+  const maxCount = Math.max(
+    1,
+    ...report.matrix1.flatMap(slot => [...slot.values()]),
+    ...report.matrix2.flatMap(slot => [...slot.values()])
+  );
+
+  let html = `<table class="daily-matrix-table">
+    <thead>
+      <tr>
+        <th rowspan="2">UTC</th>
+        <th class="path1-head" colspan="${DAILY_WSPR_BANDS.length}">PATH 1 · ${report.path1.label}</th>
+        <th class="path2-head" colspan="${DAILY_WSPR_BANDS.length}">PATH 2 · ${report.path2.label}</th>
+      </tr>
+      <tr>`;
+  DAILY_WSPR_BANDS.forEach(b => { html += `<th>${b.label}</th>`; });
+  DAILY_WSPR_BANDS.forEach(b => { html += `<th>${b.label}</th>`; });
+  html += `</tr></thead><tbody>`;
+
+  for (let slot = 0; slot < 48; slot++) {
+    html += `<tr><td class="slot-cell">${slotLabel(slot)}</td>`;
+    DAILY_WSPR_BANDS.forEach(b => {
+      const count = report.matrix1[slot].get(b.band) || 0;
+      html += `<td class="daily-cell${count ? ' has-spots' : ''}"${dailyCellStyle(count, maxCount, 1)}>${count || ''}</td>`;
+    });
+    DAILY_WSPR_BANDS.forEach(b => {
+      const count = report.matrix2[slot].get(b.band) || 0;
+      html += `<td class="daily-cell${count ? ' has-spots' : ''}"${dailyCellStyle(count, maxCount, 2)}>${count || ''}</td>`;
+    });
+    html += `</tr>`;
+  }
+  html += `</tbody></table>`;
+
+  wrap.innerHTML = html;
+  const total1 = report.matrix1.reduce((sum, slot) => sum + [...slot.values()].reduce((a, b) => a + b, 0), 0);
+  const total2 = report.matrix2.reduce((sum, slot) => sum + [...slot.values()].reduce((a, b) => a + b, 0), 0);
+  meta.textContent = `${report.dateStr} UTC · endpoint radius ${report.radiusKm.toLocaleString()} km · 30-minute slots`;
+  status.innerHTML = `Daily table ready · <strong>${report.path1.label}</strong>: ${total1.toLocaleString()} spots · <strong>${report.path2.label}</strong>: ${total2.toLocaleString()} spots`;
+}
+
+async function buildDailyWsprMatrix() {
+  const status = document.getElementById('dailyWsprStatus');
+  const path1 = getSelectedDailyPath('dailyPath1');
+  const path2 = getSelectedDailyPath('dailyPath2');
+  const dateStr = document.getElementById('dailyMatrixDate')?.value;
+  const radiusKm = getDailyMatrixRadiusKm();
+
+  if (!path1 || !path2) {
+    if (status) status.textContent = 'Select two saved favourite paths before building the daily table.';
+    return;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) {
+    if (status) status.textContent = 'Select a valid UTC date before building the daily table.';
+    return;
+  }
+
+  if (status) status.textContent = 'Querying wspr.live for both paths. This may take a few seconds...';
+  try {
+    const [matrix1, matrix2] = await Promise.all([
+      fetchDailyPathMatrix(path1, dateStr, radiusKm),
+      fetchDailyPathMatrix(path2, dateStr, radiusKm)
+    ]);
+    dailyWsprLastReport = { dateStr, radiusKm, path1, path2, matrix1, matrix2 };
+    renderDailyWsprMatrix(dailyWsprLastReport);
+  } catch (err) {
+    if (status) status.textContent = 'Unable to build the daily WSPR table. wspr.live may be unavailable, rate-limited, or blocked.';
+    console.warn('Daily WSPR matrix failed:', err);
+  }
+}
+
+function csvEscape(value) {
+  const s = String(value ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportDailyWsprCsv() {
+  const report = dailyWsprLastReport;
+  if (!report) {
+    alert('Build the daily WSPR table before exporting CSV.');
+    return;
+  }
+
+  const header = ['UTC'];
+  DAILY_WSPR_BANDS.forEach(b => header.push(`${report.path1.label} ${b.label}`));
+  DAILY_WSPR_BANDS.forEach(b => header.push(`${report.path2.label} ${b.label}`));
+  const rows = [header];
+
+  for (let slot = 0; slot < 48; slot++) {
+    const row = [slotLabel(slot)];
+    DAILY_WSPR_BANDS.forEach(b => row.push(report.matrix1[slot].get(b.band) || 0));
+    DAILY_WSPR_BANDS.forEach(b => row.push(report.matrix2[slot].get(b.band) || 0));
+    rows.push(row);
+  }
+
+  rows.push([]);
+  rows.push(['Date UTC', report.dateStr]);
+  rows.push(['Endpoint radius km', report.radiusKm]);
+  rows.push(['Source', 'wsprnet.org spot reports via wspr.live']);
+  rows.push(['Generated UTC', new Date().toISOString()]);
+
+  const csv = rows.map(row => row.map(csvEscape).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `grey-line-wspr-matrix-${report.dateStr}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function printDailyWsprMatrix() {
+  const report = dailyWsprLastReport;
+  if (!report) {
+    alert('Build the daily WSPR table before printing or saving PDF.');
+    return;
+  }
+
+  let ph = document.getElementById('printHeader');
+  if(!ph) {
+    ph = document.createElement('div');
+    ph.id = 'printHeader';
+    ph.className = 'print-header';
+    document.querySelector('.container').prepend(ph);
+  }
+  ph.innerHTML = `<h2 style="font-family:serif;margin-bottom:4px;">Daily WSPR Path Matrix</h2>
+    <p style="font-size:13px;color:#444">${report.path1.label} &nbsp;·&nbsp; ${report.path2.label}</p>
+    <p style="font-size:12px;color:#666">Date UTC: ${report.dateStr} &nbsp;·&nbsp; Endpoint radius: ${report.radiusKm.toLocaleString()} km &nbsp;·&nbsp; Source: wspr.live</p>
+    <p style="font-size:11px;color:#888">Developed by John Loftus (VK4CT) &nbsp;·&nbsp; Technical assistance: OpenAI</p><hr>`;
+
+  document.body.classList.add('daily-print-mode');
+  const cleanup = () => {
+    document.body.classList.remove('daily-print-mode');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(() => window.print(), 80);
 }
 
 function expandWindowWrapped(s, e, pct) {
