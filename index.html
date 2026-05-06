@@ -4535,6 +4535,7 @@ function refreshFavoritePathSelectors(preferredId = null) {
   const paths = getFavoritePaths();
   const selects = [document.getElementById('dailyPath1'), document.getElementById('dailyPath2')].filter(Boolean);
   const previous = new Map(selects.map(sel => [sel.id, sel.value]));
+  const pathExists = id => id && paths.some(p => p.id === id);
 
   selects.forEach((sel, index) => {
     sel.innerHTML = '';
@@ -4550,7 +4551,17 @@ function refreshFavoritePathSelectors(preferredId = null) {
       sel.appendChild(opt);
     });
 
-    const desired = preferredId || previous.get(sel.id) || (index === 0 ? paths[0]?.id : paths[1]?.id);
+    let desired = previous.get(sel.id);
+    if (!pathExists(desired)) {
+      desired = (index === 0 ? paths[0]?.id : paths.find(p => p.id !== paths[0]?.id)?.id) || '';
+    }
+    if (preferredId && !previous.get(sel.id)) {
+      if (index === 0 && !desired) desired = preferredId;
+      if (index === 1 && desired === document.getElementById('dailyPath1')?.value) desired = '';
+    }
+    if (index === 1 && desired && desired === document.getElementById('dailyPath1')?.value) {
+      desired = paths.find(p => p.id !== desired)?.id || '';
+    }
     if (desired && paths.some(p => p.id === desired)) sel.value = desired;
   });
 
@@ -4575,7 +4586,7 @@ function saveCurrentPathAsFavorite() {
     paths.sort((a, b) => (a.label || pathLabel(a)).localeCompare(b.label || pathLabel(b)));
     saveFavoritePaths(paths);
   }
-  refreshFavoritePathSelectors(candidate.id);
+  refreshFavoritePathSelectors();
   if (status) status.textContent = exists ? 'That path is already saved.' : `Saved ${candidate.label}.`;
 }
 
@@ -4734,6 +4745,10 @@ async function buildDailyWsprMatrix() {
 
   if (!path1 || !path2) {
     if (status) status.textContent = 'Select two saved favourite paths before building the daily table.';
+    return;
+  }
+  if (path1.id === path2.id) {
+    if (status) status.textContent = 'Path 1 and Path 2 must be different saved paths.';
     return;
   }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) {
