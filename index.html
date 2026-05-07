@@ -774,6 +774,7 @@ grey-line release 1.2
 
   /* ── Print styles ── */
 @media print {
+    @page { margin: 14mm 9mm 12mm; }
     body { background: #fff !important; color: #000 !important; }
     body::before { display:none; }
     .btn-calculate, .btn-scan, .btn-bestdates, .btn-print,
@@ -829,6 +830,12 @@ grey-line release 1.2
     body.daily-print-mode .daily-matrix-table td {
       color: #000 !important;
       border-color: #bbb !important;
+    }
+    body.daily-print-mode .daily-matrix-table tbody tr:nth-child(odd) td {
+      background-color: rgba(214,245,225,0.55) !important;
+    }
+    body.daily-print-mode .daily-matrix-table tbody tr:nth-child(odd) td.has-spots {
+      background-color: rgba(184,232,202,0.72) !important;
     }
     body.daily-print-mode #dailyWsprMatrixCard {
       padding: 14px 18px !important;
@@ -1659,7 +1666,7 @@ grey-line release 1.2
   }
   .daily-matrix-table {
     width: 100%;
-    min-width: 980px;
+    min-width: 900px;
     border-collapse: collapse;
     font-family: 'Share Tech Mono', monospace;
     font-size: 11px;
@@ -1667,7 +1674,7 @@ grey-line release 1.2
   .daily-matrix-table th,
   .daily-matrix-table td {
     border: 1px solid rgba(26,64,96,0.55);
-    padding: 5px 6px;
+    padding: 5px 4px;
     text-align: center;
     white-space: nowrap;
   }
@@ -1686,6 +1693,13 @@ grey-line release 1.2
   .daily-matrix-table .path2-head { color: var(--accent2); }
   .daily-matrix-table .path1-band { color: var(--accent); }
   .daily-matrix-table .path2-band { color: var(--accent2); }
+  .daily-matrix-table tbody tr:hover td {
+    background-color: rgba(220,225,230,0.12);
+  }
+  .daily-matrix-table tbody tr:hover .daily-cell.has-spots {
+    outline: 1px solid rgba(255,255,255,0.28);
+    outline-offset: -1px;
+  }
   .daily-cell {
     color: rgba(200,232,248,0.5);
     background: rgba(255,255,255,0.015);
@@ -1963,6 +1977,7 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
           <select id="wsprRadius" onchange="refreshWsprBandActivity()">
             <option value="1800">1,800 km</option>
             <option selected value="1200">1,200 km</option>
+            <option value="900">900 km</option>
             <option value="600">600 km</option>
             <option value="300">300 km</option>
             <option value="200">200 km</option>
@@ -2019,6 +2034,7 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
         <select id="dailyMatrixRadius">
           <option value="1800">1,800 km</option>
           <option selected value="1200">1,200 km</option>
+          <option value="900">900 km</option>
           <option value="600">600 km</option>
           <option value="300">300 km</option>
           <option value="200">200 km</option>
@@ -4006,6 +4022,10 @@ window.onload = function() {
   syncDisplayedMapDateFromPicker();
   const dailyDate = document.getElementById('dailyMatrixDate');
   if (dailyDate) dailyDate.value = `${y}-${m}-${d}`;
+  if (dailyDate) {
+    dailyDate.addEventListener('change', () => { dailyMatrixDateUserEdited = true; });
+    dailyDate.addEventListener('input', () => { dailyMatrixDateUserEdited = true; });
+  }
 
 
   // Grey-line expansion label
@@ -4508,6 +4528,7 @@ async function refreshWsprBandActivity() {
 const DAILY_WSPR_FAVORITES_KEY = 'rprWsprFavoritePathsV1';
 const DAILY_WSPR_BANDS = WSPR_BANDS.filter(b => ![5, 50].includes(b.band));
 let dailyWsprLastReport = null;
+let dailyMatrixDateUserEdited = false;
 
 function getFavoritePaths() {
   try {
@@ -4713,6 +4734,29 @@ function slotLabel(slot) {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 }
 
+function reportCityName(city) {
+  return String(city?.city || city?.name || 'Unknown').split(',')[0].trim();
+}
+
+function reportPathFileLabel(path) {
+  const a = reportCityName(path.cityA);
+  const b = reportCityName(path.cityB);
+  return `${a}<>${b}`.replace(/\s+/g, '');
+}
+
+function safeReportFilenamePart(value) {
+  return String(value)
+    .replace(/[\\/:*?"|]/g, '-')
+    .replace(/\s+/g, '')
+    .replace(/_+/g, '_');
+}
+
+function dailyReportFilenameBase(report) {
+  const p1 = safeReportFilenamePart(reportPathFileLabel(report.path1));
+  const p2 = safeReportFilenamePart(reportPathFileLabel(report.path2));
+  return `wspr_path_matrix_${p1}_${p2}_${report.dateStr}`;
+}
+
 function dailyCellStyle(count, maxCount, pathIndex) {
   if (!count) return '';
   const ratio = maxCount > 0 ? Math.min(1, count / maxCount) : 0;
@@ -4812,10 +4856,16 @@ function exportDailyWsprCsv() {
     return;
   }
 
-  const header = ['UTC'];
-  DAILY_WSPR_BANDS.forEach(b => header.push(`${report.path1.label} ${b.label}`));
-  DAILY_WSPR_BANDS.forEach(b => header.push(`${report.path2.label} ${b.label}`));
-  const rows = [header];
+  const pathHeader = ['UTC'];
+  pathHeader.push(report.path1.label);
+  for (let i = 1; i < DAILY_WSPR_BANDS.length; i++) pathHeader.push('');
+  pathHeader.push(report.path2.label);
+  for (let i = 1; i < DAILY_WSPR_BANDS.length; i++) pathHeader.push('');
+
+  const bandHeader = ['UTC'];
+  DAILY_WSPR_BANDS.forEach(b => bandHeader.push(b.label));
+  DAILY_WSPR_BANDS.forEach(b => bandHeader.push(b.label));
+  const rows = [pathHeader, bandHeader];
 
   for (let slot = 0; slot < 48; slot++) {
     const row = [slotLabel(slot)];
@@ -4835,7 +4885,7 @@ function exportDailyWsprCsv() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `grey-line-wspr-matrix-${report.dateStr}.csv`;
+  a.download = `${dailyReportFilenameBase(report)}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -4861,9 +4911,12 @@ function printDailyWsprMatrix() {
     <p style="font-size:12px;color:#666">Date UTC: ${report.dateStr} &nbsp;·&nbsp; Endpoint radius: ${report.radiusKm.toLocaleString()} km &nbsp;·&nbsp; Source: wspr.live</p>
     <p style="font-size:11px;color:#888">Developed by John Loftus (VK4CT) &nbsp;·&nbsp; Technical assistance: OpenAI</p><hr>`;
 
+  const originalTitle = document.title;
+  document.title = `${dailyReportFilenameBase(report)}.pdf`;
   document.body.classList.add('daily-print-mode');
   const cleanup = () => {
     document.body.classList.remove('daily-print-mode');
+    document.title = originalTitle;
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
@@ -6247,6 +6300,10 @@ function syncDisplayedMapDateFromPicker() {
 
   const dateEl = document.getElementById('mapDateReadout');
   if (dateEl) dateEl.textContent = dateLabel;
+  const dailyDateEl = document.getElementById('dailyMatrixDate');
+  if (dailyDateEl && !dailyMatrixDateUserEdited) {
+    dailyDateEl.value = pickerDateStr;
+  }
 
   const timePart = (window.mapState && typeof mapState.utcHour === 'number')
     ? hDecToStr(mapState.utcHour)
