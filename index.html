@@ -1642,6 +1642,22 @@ grey-line release 1.2
     font-size: 10px;
     color: var(--muted);
   }
+  .daily-guide {
+    display: none;
+    margin: 10px 0 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(0,255,157,0.22);
+    border-radius: 8px;
+    background: rgba(0,255,157,0.045);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    line-height: 1.65;
+  }
+  .daily-guide.visible { display: block; }
+  .daily-guide ol {
+    margin-left: 20px;
+  }
   .daily-actions {
     display: flex;
     align-items: center;
@@ -1691,6 +1707,11 @@ grey-line release 1.2
   }
   .daily-matrix-table .path1-head { color: var(--accent); }
   .daily-matrix-table .path2-head { color: var(--accent2); }
+  .daily-matrix-table .date-head { color: var(--green); }
+  .daily-matrix-table .continent-head {
+    color: var(--muted);
+    background: rgba(10,26,38,0.96);
+  }
   .daily-matrix-table .path1-band { color: var(--accent); }
   .daily-matrix-table .path2-band { color: var(--accent2); }
   .daily-matrix-table tbody tr:hover td {
@@ -1709,6 +1730,11 @@ grey-line release 1.2
     font-weight: 600;
     font-size: 12px;
     text-shadow: 0 1px 2px rgba(0,0,0,0.72);
+  }
+  .daily-total-cell {
+    color: var(--green);
+    background: rgba(0,255,157,0.08);
+    font-weight: 700;
   }
   .daily-note {
     margin-top: 10px;
@@ -2006,9 +2032,23 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
   </div>
 
   <div class="daily-fav-manager">
+    <button class="mini-btn" type="button" onclick="toggleDailyWsprGuide()">GUIDE</button>
     <button class="mini-btn" type="button" onclick="saveCurrentPathAsFavorite()">SAVE CURRENT PATH</button>
     <button class="mini-btn" type="button" onclick="deleteSelectedFavoritePath()">DELETE SELECTED PATH</button>
     <span id="favoritePathStatus">Favourite paths are stored in this browser.</span>
+  </div>
+
+  <div class="daily-guide" id="dailyWsprGuide">
+    <ol>
+      <li>Select Station Alpha/Bravo for the first path.</li>
+      <li>Press SAVE CURRENT PATH to save the first path.</li>
+      <li>Select Station Alpha/Bravo for the second path.</li>
+      <li>Press SAVE CURRENT PATH to save the second path.</li>
+      <li>Edit the Date UTC window if needed.</li>
+      <li>Select your preferred endpoint radius.</li>
+      <li>Press BUILD DAILY TABLE.</li>
+      <li>Press EXPORT CSV, EXPORT XLSX, or PRINT / PDF.</li>
+    </ol>
   </div>
 
   <div class="daily-config">
@@ -2048,6 +2088,7 @@ The time line is placed below the map. Results show dawn, sunrise, sunset and du
   <div class="daily-actions">
     <button class="mini-btn" type="button" onclick="buildDailyWsprMatrix()">BUILD DAILY TABLE</button>
     <button class="mini-btn" type="button" onclick="exportDailyWsprCsv()">EXPORT CSV</button>
+    <button class="mini-btn" type="button" onclick="exportDailyWsprXlsx()">EXPORT XLSX</button>
     <button class="mini-btn" type="button" onclick="printDailyWsprMatrix()">PRINT / PDF</button>
   </div>
 
@@ -4657,6 +4698,10 @@ function deleteSelectedFavoritePath() {
   if (status) status.textContent = path ? `Deleted ${path.label || pathLabel(path)}.` : 'Saved path deleted.';
 }
 
+function toggleDailyWsprGuide() {
+  document.getElementById('dailyWsprGuide')?.classList.toggle('visible');
+}
+
 function getSelectedDailyPath(selectId) {
   const id = document.getElementById(selectId)?.value;
   if (!id) return null;
@@ -4741,7 +4786,7 @@ function reportCityName(city) {
 function reportPathFileLabel(path) {
   const a = reportCityName(path.cityA);
   const b = reportCityName(path.cityB);
-  return `${a}<>${b}`.replace(/\s+/g, '');
+  return `${a}_${b}`.replace(/\s+/g, '');
 }
 
 function safeReportFilenamePart(value) {
@@ -4755,6 +4800,58 @@ function dailyReportFilenameBase(report) {
   const p1 = safeReportFilenamePart(reportPathFileLabel(report.path1));
   const p2 = safeReportFilenamePart(reportPathFileLabel(report.path2));
   return `wspr_path_matrix_${p1}_${p2}_${report.dateStr}`;
+}
+
+function pathContinentLabel(path) {
+  const raw = path?.b?.cont || '';
+  const map = {
+    Europe: 'EU',
+    'North America': 'NA',
+    Oceania: 'OC',
+    Asia: 'AS',
+    Africa: 'AF',
+    'South America': 'SA'
+  };
+  return map[raw] || raw.toUpperCase().slice(0, 3) || 'PATH';
+}
+
+function matrixValue(count) {
+  return count ? count : '';
+}
+
+function buildDailyMatrixExportRows(report, includeMeta = true) {
+  const rows = [];
+  const titleRow = [`Date UTC: ${report.dateStr}`];
+  rows.push(titleRow);
+  rows.push(['Path', report.path1.label, ...Array(DAILY_WSPR_BANDS.length - 1).fill(''), report.path2.label, ...Array(DAILY_WSPR_BANDS.length - 1).fill('')]);
+  rows.push(['Region', pathContinentLabel(report.path1), ...Array(DAILY_WSPR_BANDS.length - 1).fill(''), pathContinentLabel(report.path2), ...Array(DAILY_WSPR_BANDS.length - 1).fill('')]);
+  rows.push(['UTC', ...DAILY_WSPR_BANDS.map(b => b.label), ...DAILY_WSPR_BANDS.map(b => b.label)]);
+
+  for (let slot = 0; slot < 48; slot++) {
+    rows.push([
+      slotLabel(slot),
+      ...DAILY_WSPR_BANDS.map(b => matrixValue(report.matrix1[slot].get(b.band) || 0)),
+      ...DAILY_WSPR_BANDS.map(b => matrixValue(report.matrix2[slot].get(b.band) || 0))
+    ]);
+  }
+
+  rows.push(['Total', ...dailyBandTotals(report.matrix1), ...dailyBandTotals(report.matrix2)]);
+  rows.push(['Band', ...DAILY_WSPR_BANDS.map(b => b.label), ...DAILY_WSPR_BANDS.map(b => b.label)]);
+
+  if (includeMeta) {
+    rows.push([]);
+    rows.push(['Endpoint radius km', report.radiusKm]);
+    rows.push(['Source', 'wsprnet.org spot reports via wspr.live']);
+    rows.push(['Generated UTC', new Date().toISOString()]);
+  }
+
+  return rows;
+}
+
+function dailyBandTotals(matrix) {
+  return DAILY_WSPR_BANDS.map(b =>
+    matrix.reduce((sum, slot) => sum + (slot.get(b.band) || 0), 0)
+  );
 }
 
 function dailyCellStyle(count, maxCount, pathIndex) {
@@ -4780,9 +4877,16 @@ function renderDailyWsprMatrix(report) {
   let html = `<table class="daily-matrix-table">
     <thead>
       <tr>
-        <th rowspan="2">UTC</th>
+        <th class="date-head" colspan="${1 + DAILY_WSPR_BANDS.length * 2}">DATE UTC · ${report.dateStr}</th>
+      </tr>
+      <tr>
+        <th rowspan="3">UTC</th>
         <th class="path1-head" colspan="${DAILY_WSPR_BANDS.length}">PATH 1 · ${report.path1.label}</th>
         <th class="path2-head" colspan="${DAILY_WSPR_BANDS.length}">PATH 2 · ${report.path2.label}</th>
+      </tr>
+      <tr>
+        <th class="continent-head" colspan="${DAILY_WSPR_BANDS.length}">${pathContinentLabel(report.path1)}</th>
+        <th class="continent-head" colspan="${DAILY_WSPR_BANDS.length}">${pathContinentLabel(report.path2)}</th>
       </tr>
       <tr>`;
   DAILY_WSPR_BANDS.forEach(b => { html += `<th class="path1-band">${b.label}</th>`; });
@@ -4793,14 +4897,23 @@ function renderDailyWsprMatrix(report) {
     html += `<tr><td class="slot-cell">${slotLabel(slot)}</td>`;
     DAILY_WSPR_BANDS.forEach(b => {
       const count = report.matrix1[slot].get(b.band) || 0;
-      html += `<td class="daily-cell${count ? ' has-spots' : ''}"${dailyCellStyle(count, maxCount, 1)}>${count || ''}</td>`;
+      html += `<td class="daily-cell${count ? ' has-spots' : ''}"${dailyCellStyle(count, maxCount, 1)}>${matrixValue(count)}</td>`;
     });
     DAILY_WSPR_BANDS.forEach(b => {
       const count = report.matrix2[slot].get(b.band) || 0;
-      html += `<td class="daily-cell${count ? ' has-spots' : ''}"${dailyCellStyle(count, maxCount, 2)}>${count || ''}</td>`;
+      html += `<td class="daily-cell${count ? ' has-spots' : ''}"${dailyCellStyle(count, maxCount, 2)}>${matrixValue(count)}</td>`;
     });
     html += `</tr>`;
   }
+  const totals1 = dailyBandTotals(report.matrix1);
+  const totals2 = dailyBandTotals(report.matrix2);
+  html += `<tr><td class="slot-cell">TOTAL</td>`;
+  totals1.forEach(v => { html += `<td class="daily-total-cell">${v || ''}</td>`; });
+  totals2.forEach(v => { html += `<td class="daily-total-cell">${v || ''}</td>`; });
+  html += `</tr><tr><td class="slot-cell">BAND</td>`;
+  DAILY_WSPR_BANDS.forEach(b => { html += `<td class="path1-band">${b.label}</td>`; });
+  DAILY_WSPR_BANDS.forEach(b => { html += `<td class="path2-band">${b.label}</td>`; });
+  html += `</tr>`;
   html += `</tbody></table>`;
 
   wrap.innerHTML = html;
@@ -4856,36 +4969,151 @@ function exportDailyWsprCsv() {
     return;
   }
 
-  const pathHeader = ['UTC'];
-  pathHeader.push(report.path1.label);
-  for (let i = 1; i < DAILY_WSPR_BANDS.length; i++) pathHeader.push('');
-  pathHeader.push(report.path2.label);
-  for (let i = 1; i < DAILY_WSPR_BANDS.length; i++) pathHeader.push('');
-
-  const bandHeader = ['UTC'];
-  DAILY_WSPR_BANDS.forEach(b => bandHeader.push(b.label));
-  DAILY_WSPR_BANDS.forEach(b => bandHeader.push(b.label));
-  const rows = [pathHeader, bandHeader];
-
-  for (let slot = 0; slot < 48; slot++) {
-    const row = [slotLabel(slot)];
-    DAILY_WSPR_BANDS.forEach(b => row.push(report.matrix1[slot].get(b.band) || 0));
-    DAILY_WSPR_BANDS.forEach(b => row.push(report.matrix2[slot].get(b.band) || 0));
-    rows.push(row);
-  }
-
-  rows.push([]);
-  rows.push(['Date UTC', report.dateStr]);
-  rows.push(['Endpoint radius km', report.radiusKm]);
-  rows.push(['Source', 'wsprnet.org spot reports via wspr.live']);
-  rows.push(['Generated UTC', new Date().toISOString()]);
-
+  const rows = buildDailyMatrixExportRows(report, true);
   const csv = rows.map(row => row.map(csvEscape).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = `${dailyReportFilenameBase(report)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function xmlEscape(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function columnName(index) {
+  let n = index + 1;
+  let s = '';
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function makeXlsxSheetXml(rows) {
+  const sheetRows = rows.map((row, rIdx) => {
+    const cells = row.map((value, cIdx) => {
+      const ref = `${columnName(cIdx)}${rIdx + 1}`;
+      if (typeof value === 'number') return `<c r="${ref}"><v>${value}</v></c>`;
+      return `<c r="${ref}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
+    }).join('');
+    return `<row r="${rIdx + 1}">${cells}</row>`;
+  }).join('');
+
+  const widths = Array.from({ length: 1 + DAILY_WSPR_BANDS.length * 2 }, (_, i) => {
+    const width = i === 0 ? 9 : 7;
+    return `<col min="${i + 1}" max="${i + 1}" width="${width}" customWidth="1"/>`;
+  }).join('');
+
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <cols>${widths}</cols>
+  <sheetData>${sheetRows}</sheetData>
+</worksheet>`;
+}
+
+function crc32(bytes) {
+  if (!crc32.table) {
+    crc32.table = Array.from({ length: 256 }, (_, n) => {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+      return c >>> 0;
+    });
+  }
+  let c = 0xffffffff;
+  for (const b of bytes) c = crc32.table[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function u16(n) { return [n & 255, (n >>> 8) & 255]; }
+function u32(n) { return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]; }
+
+function makeZip(files) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+
+  files.forEach(file => {
+    const nameBytes = encoder.encode(file.name);
+    const data = encoder.encode(file.content);
+    const crc = crc32(data);
+    const local = new Uint8Array([
+      ...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0),
+      ...nameBytes, ...data
+    ]);
+    localParts.push(local);
+
+    const central = new Uint8Array([
+      ...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
+      ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0), ...u16(0),
+      ...u16(0), ...u16(0), ...u32(0), ...u32(offset), ...nameBytes
+    ]);
+    centralParts.push(central);
+    offset += local.length;
+  });
+
+  const centralSize = centralParts.reduce((sum, p) => sum + p.length, 0);
+  const end = new Uint8Array([
+    ...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length),
+    ...u32(centralSize), ...u32(offset), ...u16(0)
+  ]);
+
+  return new Blob([...localParts, ...centralParts, end], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+}
+
+function makeDailyWsprXlsxBlob(report) {
+  const rows = buildDailyMatrixExportRows(report, true);
+  const sheet = makeXlsxSheetXml(rows);
+  return makeZip([
+    { name: '[Content_Types].xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>` },
+    { name: '_rels/.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>` },
+    { name: 'xl/workbook.xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="WSPR Matrix" sheetId="1" r:id="rId1"/></sheets>
+</workbook>` },
+    { name: 'xl/_rels/workbook.xml.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>` },
+    { name: 'xl/worksheets/sheet1.xml', content: sheet }
+  ]);
+}
+
+function exportDailyWsprXlsx() {
+  const report = dailyWsprLastReport;
+  if (!report) {
+    alert('Build the daily WSPR table before exporting XLSX.');
+    return;
+  }
+  const blob = makeDailyWsprXlsxBlob(report);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${dailyReportFilenameBase(report)}.xlsx`;
   document.body.appendChild(a);
   a.click();
   a.remove();
