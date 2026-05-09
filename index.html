@@ -774,7 +774,7 @@ grey-line release 1.2
 
   /* ── Print styles ── */
 @media print {
-    @page { margin: 14mm 9mm 12mm; }
+    @page { margin: 18mm 9mm 12mm; }
     body { background: #fff !important; color: #000 !important; }
     body::before { display:none; }
     .btn-calculate, .btn-scan, .btn-bestdates, .btn-print,
@@ -837,6 +837,9 @@ grey-line release 1.2
     body.daily-print-mode .daily-matrix-table tbody tr:nth-child(odd) td.has-spots {
       background-color: rgba(184,232,202,0.72) !important;
     }
+    body.daily-print-mode .daily-matrix-table tbody tr:nth-child(even) td {
+      background-color: #f2f2f2 !important;
+    }
     body.daily-print-mode #dailyWsprMatrixCard {
       padding: 14px 18px !important;
       margin-bottom: 8px !important;
@@ -852,10 +855,19 @@ grey-line release 1.2
     }
     body.daily-print-mode .daily-matrix-table {
       font-size: 9px !important;
+      border-collapse: separate !important;
+      border-spacing: 0 !important;
+    }
+    body.daily-print-mode .daily-matrix-table thead {
+      display: table-header-group !important;
     }
     body.daily-print-mode .daily-matrix-table th,
     body.daily-print-mode .daily-matrix-table td {
       padding: 3px 4px !important;
+      line-height: 1.25 !important;
+    }
+    body.daily-print-mode .daily-matrix-table .date-head {
+      padding-top: 6px !important;
     }
     body.daily-print-mode .daily-cell.has-spots {
       font-weight: 400 !important;
@@ -1705,15 +1717,19 @@ grey-line release 1.2
     background: rgba(0,0,0,0.22);
     font-weight: 700;
   }
-  .daily-matrix-table .path1-head { color: var(--accent); }
-  .daily-matrix-table .path2-head { color: var(--accent2); }
+  .daily-matrix-table .path1-head { color: var(--accent2); }
+  .daily-matrix-table .path2-head { color: var(--accent); }
   .daily-matrix-table .date-head { color: var(--green); }
   .daily-matrix-table .continent-head {
     color: var(--muted);
     background: rgba(10,26,38,0.96);
   }
-  .daily-matrix-table .path1-band { color: var(--accent); }
-  .daily-matrix-table .path2-band { color: var(--accent2); }
+  .daily-matrix-table .path1-band { color: var(--accent2); }
+  .daily-matrix-table .path2-band { color: var(--accent); }
+  .daily-matrix-table tbody tr:nth-child(even) .daily-cell,
+  .daily-matrix-table tbody tr:nth-child(even) .slot-cell {
+    background-color: rgba(220,225,230,0.055);
+  }
   .daily-matrix-table tbody tr:hover td {
     background-color: rgba(220,225,230,0.12);
   }
@@ -4646,15 +4662,21 @@ function refreshFavoritePathSelectors(preferredId = null) {
     if (!pathExists(desired)) {
       desired = (index === 0 ? paths[0]?.id : paths.find(p => p.id !== paths[0]?.id)?.id) || '';
     }
-    if (preferredId && !previous.get(sel.id)) {
-      if (index === 0 && !desired) desired = preferredId;
-      if (index === 1 && desired === document.getElementById('dailyPath1')?.value) desired = '';
-    }
     if (index === 1 && desired && desired === document.getElementById('dailyPath1')?.value) {
       desired = paths.find(p => p.id !== desired)?.id || '';
     }
     if (desired && paths.some(p => p.id === desired)) sel.value = desired;
   });
+
+  if (preferredId && pathExists(preferredId)) {
+    const sel1 = document.getElementById('dailyPath1');
+    const sel2 = document.getElementById('dailyPath2');
+    if (sel1 && (!previous.get('dailyPath1') || previous.get('dailyPath1') === preferredId)) {
+      sel1.value = preferredId;
+    } else if (sel2 && preferredId !== sel1?.value) {
+      sel2.value = preferredId;
+    }
+  }
 
   const status = document.getElementById('favoritePathStatus');
   if (status) status.textContent = paths.length
@@ -4677,8 +4699,10 @@ function saveCurrentPathAsFavorite() {
     paths.sort((a, b) => (a.label || pathLabel(a)).localeCompare(b.label || pathLabel(b)));
     saveFavoritePaths(paths);
   }
-  refreshFavoritePathSelectors();
-  if (status) status.textContent = exists ? 'That path is already saved.' : `Saved ${candidate.label}.`;
+  refreshFavoritePathSelectors(candidate.id);
+  if (status) status.textContent = exists
+    ? `That path is already saved. Selected ${candidate.label}.`
+    : `Saved and selected ${candidate.label}.`;
 }
 
 function deleteSelectedFavoritePath() {
@@ -4858,7 +4882,7 @@ function dailyCellStyle(count, maxCount, pathIndex) {
   if (!count) return '';
   const ratio = maxCount > 0 ? Math.min(1, count / maxCount) : 0;
   const strength = 0.18 + Math.sqrt(ratio) * 0.36;
-  const rgb = pathIndex === 1 ? '0,200,255' : '255,106,0';
+  const rgb = pathIndex === 1 ? '255,106,0' : '0,200,255';
   return ` style="background:rgba(${rgb},${strength.toFixed(2)})"`;
 }
 
@@ -5001,12 +5025,23 @@ function columnName(index) {
   return s;
 }
 
+function xlsxStyleForCell(rIdx, cIdx, value) {
+  if (rIdx === 0) return 1;
+  if (rIdx >= 1 && rIdx <= 3) return 2;
+  if (String(value || '').toUpperCase() === 'TOTAL') return 4;
+  if (rIdx === 52 || rIdx === 53) return 4;
+  if (rIdx >= 4 && rIdx <= 51) return rIdx % 2 === 0 ? 3 : 0;
+  return 0;
+}
+
 function makeXlsxSheetXml(rows) {
   const sheetRows = rows.map((row, rIdx) => {
     const cells = row.map((value, cIdx) => {
       const ref = `${columnName(cIdx)}${rIdx + 1}`;
-      if (typeof value === 'number') return `<c r="${ref}"><v>${value}</v></c>`;
-      return `<c r="${ref}" t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
+      const style = xlsxStyleForCell(rIdx, cIdx, value);
+      const styleAttr = style ? ` s="${style}"` : '';
+      if (typeof value === 'number') return `<c r="${ref}"${styleAttr}><v>${value}</v></c>`;
+      return `<c r="${ref}"${styleAttr} t="inlineStr"><is><t>${xmlEscape(value)}</t></is></c>`;
     }).join('');
     return `<row r="${rIdx + 1}">${cells}</row>`;
   }).join('');
@@ -5018,9 +5053,46 @@ function makeXlsxSheetXml(rows) {
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetViews><sheetView workbookViewId="0" showGridLines="1"/></sheetViews>
   <cols>${widths}</cols>
   <sheetData>${sheetRows}</sheetData>
 </worksheet>`;
+}
+
+function makeXlsxStylesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="3">
+    <font><sz val="10"/><name val="Liberation Mono"/></font>
+    <font><b/><sz val="12"/><name val="Liberation Sans"/></font>
+    <font><b/><sz val="10"/><name val="Liberation Mono"/></font>
+  </fonts>
+  <fills count="4">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFE7E6E6"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFD9EAF7"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border>
+      <left style="thin"><color rgb="FFB7B7B7"/></left>
+      <right style="thin"><color rgb="FFB7B7B7"/></right>
+      <top style="thin"><color rgb="FFB7B7B7"/></top>
+      <bottom style="thin"><color rgb="FFB7B7B7"/></bottom>
+      <diagonal/>
+    </border>
+  </borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="5">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>
+    <xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="2" borderId="1" xfId="0" applyFill="1" applyBorder="1"/>
+    <xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>
+  </cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
 }
 
 function crc32(bytes) {
@@ -5079,12 +5151,14 @@ function makeZip(files) {
 function makeDailyWsprXlsxBlob(report) {
   const rows = buildDailyMatrixExportRows(report, true);
   const sheet = makeXlsxSheetXml(rows);
+  const styles = makeXlsxStylesXml();
   return makeZip([
     { name: '[Content_Types].xml', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
   <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
 </Types>` },
     { name: '_rels/.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -5098,7 +5172,9 @@ function makeDailyWsprXlsxBlob(report) {
     { name: 'xl/_rels/workbook.xml.rels', content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>` },
+    { name: 'xl/styles.xml', content: styles },
     { name: 'xl/worksheets/sheet1.xml', content: sheet }
   ]);
 }
